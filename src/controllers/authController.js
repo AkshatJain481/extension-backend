@@ -51,12 +51,6 @@ const redirectInstagram = async (req, res) => {
     <script>
       chrome.runtime.sendMessage('bdapmfkonpgamlakoplnbllgdaboopgi', { code: '${code}' }, function(response) {
         window.close(); // ✅ Close the Instagram popup
-        chrome.windows.create({ // ✅ Open the extension manually
-          url: 'chrome-extension://bdapmfkonpgamlakoplnbllgdaboopgi/index.html#/insta-login',
-          type: 'popup',
-          width: 400,
-          height: 500
-        });
       });
     </script>
   `;
