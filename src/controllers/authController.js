@@ -27,7 +27,7 @@ const login = (req, res) => {
   const { CLIENT_ID, redirectURI } = process.env;
 
   const instagramAuthUrl =
-    `https://www.instagram.com/oauth/authorize?` +
+    `https://api.instagram.com/oauth/authorize?` +
     `enable_fb_login=0&force_authentication=1&` +
     `client_id=${CLIENT_ID}&` +
     `redirect_uri=${encodeURIComponent(redirectURI)}&` +
