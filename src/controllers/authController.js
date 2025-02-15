@@ -1,16 +1,16 @@
-const axios = require('axios');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const User = require('../models/User');
-const nodemailer = require('nodemailer');
+const axios = require("axios");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const User = require("../models/User");
+const nodemailer = require("nodemailer");
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "30d" });
 };
 
 // Create a transporter for sending emails (using Gmail as an example)
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  service: "gmail",
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -19,7 +19,7 @@ const transporter = nodemailer.createTransport({
 
 /**
  * Redirects the user to the Instagram OAuth authorization URL.
- * 
+ *
  * @param {Object} req - The HTTP request object.
  * @param {Object} res - The HTTP response object.
  */
@@ -40,52 +40,38 @@ const login = (req, res) => {
   res.redirect(instagramAuthUrl);
 };
 
-router.get("/redirectinstagram", async (req, res) => {
+const redirectInstagram = async (req, res) => {
   const { code } = req.query;
 
   if (!code) {
     return res.status(400).json({ error: "Authorization code is missing." });
   }
 
-  try {
-    // Exchange the code for an access token
-    const tokenResponse = await axios.post(
-      "https://api.instagram.com/oauth/access_token",
-      {
-        client_id: process.env.CLIENT_ID,
-        client_secret: process.env.CLIENT_SECRET,
-        grant_type: "authorization_code",
-        redirect_uri: process.env.redirectURI,
-        code: code,
-      }
-    );
+  const extensionId = "bdapmfkonpgamlakoplnbllgdaboopgi"; // Your extension ID
 
-    const accessToken = tokenResponse.data.access_token;
+  const script = `
+    <script>
+      (async function() {
+        try {
+          console.log("Sending code to extension...");
+          const response = await chrome.runtime.sendMessage("${extensionId}", { code: "${code}" });
+          console.log("Response from extension:", response);
+        } catch (error) {
+          console.error("Error sending message:", error);
+        } finally {
+          window.close(); // ✅ Always close the popup
+        }
+      })();
+    </script>
+  `;
 
-    // Send the access token back to the extension via postMessage
-    const script = `
-      <script>
-        (function() {
-          window.opener.postMessage({ accessToken: "${accessToken}" }, "*");
-          window.close();
-        })();
-      </script>
-    `;
-
-    res.send(script);
-  } catch (error) {
-    console.error("Error exchanging code for access token:", error);
-    res.status(500).send("Error during authentication");
-  }
-});
-
-
-
+  res.send(script);
+};
 
 /**
  * Handles the Instagram OAuth redirect by exchanging the authorization code
  * for an access token.
- * 
+ *
  * @param {Object} req - The HTTP request object.
  * @param {Object} req.query - The query parameters of the request.
  * @param {string} req.query.code - The authorization code returned by Instagram.
@@ -96,23 +82,26 @@ const redirect = async (req, res) => {
   const { code } = req.query;
   console.log("code", code);
   if (!code) {
-    return res.status(400).json({ error: 'Authorization code is missing.' });
+    return res.status(400).json({ error: "Authorization code is missing." });
   }
 
   try {
-    const tokenResponse = await axios.post('https://api.instagram.com/oauth/access_token', {
-      client_id: process.env.CLIENT_ID,
-      client_secret: process.env.CLIENT_SECRET,
-      grant_type: 'authorization_code',
-      redirect_uri: encodeURIComponent(process.env.REDIRECT_URI),
-      code,
-    });
+    const tokenResponse = await axios.post(
+      "https://api.instagram.com/oauth/access_token",
+      {
+        client_id: process.env.CLIENT_ID,
+        client_secret: process.env.CLIENT_SECRET,
+        grant_type: "authorization_code",
+        redirect_uri: encodeURIComponent(process.env.REDIRECT_URI),
+        code,
+      }
+    );
 
     const { access_token, user_id } = tokenResponse.data;
     res.status(200).json({ access_token, user_id });
   } catch (error) {
     res.status(500).json({
-      error: 'Failed to exchange code for access token.',
+      error: "Failed to exchange code for access token.",
       details: error.response?.data || error.message,
     });
   }
@@ -120,7 +109,7 @@ const redirect = async (req, res) => {
 
 /**
  * Registers a new user.
- * 
+ *
  * @param {Object} req - The HTTP request object.
  * @param {Object} res - The HTTP response object.
  */
@@ -128,14 +117,14 @@ const userSignup = async (req, res) => {
   const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
-    return res.status(400).json({ message: 'All fields are required.' });
+    return res.status(400).json({ message: "All fields are required." });
   }
 
   try {
     const userExists = await User.findOne({ email });
 
     if (userExists) {
-      return res.status(400).json({ message: 'User already exists.' });
+      return res.status(400).json({ message: "User already exists." });
     }
 
     const user = await User.create({ name, email, password });
@@ -146,7 +135,7 @@ const userSignup = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      message: 'Error registering user.',
+      message: "Error registering user.",
       error: error.message,
     });
   }
@@ -154,24 +143,26 @@ const userSignup = async (req, res) => {
 
 /**
  * Logs in an existing user.
- * 
+ *
  * @param {Object} req - The HTTP request object.
  * @param {Object} res - The HTTP response object.
  */
 const loginUser = async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
-    return res.status(400).json({ message: 'Email and password are required.' });
+    return res
+      .status(400)
+      .json({ message: "Email and password are required." });
   }
 
   try {
     const user = await User.findOne({ email });
 
     if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ message: 'Invalid credentials.' });
+      return res.status(401).json({ message: "Invalid credentials." });
     }
     // In loginUser function
-    console.log('User found:', user);
+    console.log("User found:", user);
     // console.log('Password match:', isMatch);
 
     res.status(200).json({
@@ -180,25 +171,24 @@ const loginUser = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      message: 'Error logging in user.',
+      message: "Error logging in user.",
       error: error.message,
     });
   }
 };
 
-
 /**
- * Logs out a user by sending a success message. 
- * 
- * Note: Since JWT is stateless, logging out involves the client removing the token. 
+ * Logs out a user by sending a success message.
+ *
+ * Note: Since JWT is stateless, logging out involves the client removing the token.
  * This endpoint serves as an acknowledgment for the logout action.
- * 
+ *
  * @param {Object} req - The HTTP request object.
  * @param {Object} res - The HTTP response object.
  * @returns {void} Sends a JSON response with a success message.
  */
 const logoutUser = (req, res) => {
-  res.status(200).json({ message: 'User logged out successfully.' });
+  res.status(200).json({ message: "User logged out successfully." });
 };
 
 const getProfile = async (req, res) => {
@@ -220,25 +210,27 @@ const forgotPassword = async (req, res) => {
   const { email } = req.body;
 
   if (!email) {
-    return res.status(400).json({ message: 'Email is required.' });
+    return res.status(400).json({ message: "Email is required." });
   }
 
   try {
     const user = await User.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
+      return res.status(404).json({ message: "User not found." });
     }
 
     // Generate reset token
-    const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
 
     const resetLink = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: 'Password Reset Request',
+      subject: "Password Reset Request",
       html: `
           <h3>Hello ${user.name},</h3>
           <p>You requested a password reset. Click the link below to reset your password:</p>
@@ -249,9 +241,16 @@ const forgotPassword = async (req, res) => {
 
     await transporter.sendMail(mailOptions);
 
-    res.status(200).json({ message: 'Password reset link has been sent to your email.' });
+    res
+      .status(200)
+      .json({ message: "Password reset link has been sent to your email." });
   } catch (error) {
-    res.status(500).json({ message: 'Error processing password reset request.', error: error.message });
+    res
+      .status(500)
+      .json({
+        message: "Error processing password reset request.",
+        error: error.message,
+      });
   }
 };
 
@@ -262,7 +261,7 @@ const resetPassword = async (req, res) => {
   const { token, newPassword } = req.body;
 
   if (!token || !newPassword) {
-    return res.status(400).json({ message: 'Missing token or password.' });
+    return res.status(400).json({ message: "Missing token or password." });
   }
 
   try {
@@ -274,18 +273,18 @@ const resetPassword = async (req, res) => {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Update the user's password
-    const user = await User.findByIdAndUpdate(userId, { password: hashedPassword });
+    const user = await User.findByIdAndUpdate(userId, {
+      password: hashedPassword,
+    });
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found.' });
+      return res.status(404).json({ message: "User not found." });
     }
-    return res.status(200).json({ message: 'Password reset successfully.' });
+    return res.status(200).json({ message: "Password reset successfully." });
   } catch (err) {
-    return res.status(500).json({ message: 'Error resetting password.' });
+    return res.status(500).json({ message: "Error resetting password." });
   }
 };
-
-
 
 /**
  * Verifies the reset token for validity.
@@ -295,18 +294,18 @@ const verifyResetToken = async (req, res) => {
 
   jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
     if (err) {
-      return res.status(400).json({ message: 'Invalid or expired token.' });
+      return res.status(400).json({ message: "Invalid or expired token." });
     }
 
     try {
       const user = await User.findById(decoded.id);
       if (!user) {
-        return res.status(400).json({ message: 'User not found.' });
+        return res.status(400).json({ message: "User not found." });
       }
 
-      return res.status(200).json({ message: 'Token is valid.' });
+      return res.status(200).json({ message: "Token is valid." });
     } catch (err) {
-      return res.status(500).json({ message: 'Internal server error.' });
+      return res.status(500).json({ message: "Internal server error." });
     }
   });
 };
@@ -321,5 +320,5 @@ module.exports = {
   forgotPassword,
   resetPassword,
   verifyResetToken,
-  redirectInstagram
+  redirectInstagram,
 };
