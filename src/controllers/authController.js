@@ -47,16 +47,27 @@ const redirectInstagram = async (req, res) => {
     return res.status(400).json({ error: "Authorization code is missing." });
   }
 
+  const extensionId = "bdapmfkonpgamlakoplnbllgdaboopgi"; // Your extension ID
+
   const script = `
     <script>
-      chrome.runtime.sendMessage('bdapmfkonpgamlakoplnbllgdaboopgi', { code: '${code}' }, function(response) {
-        window.close(); // ✅ Close the Instagram popup
-      });
+      (async function() {
+        try {
+          console.log("Sending code to extension...");
+          const response = await chrome.runtime.sendMessage("${extensionId}", { code: "${code}" });
+          console.log("Response from extension:", response);
+        } catch (error) {
+          console.error("Error sending message:", error);
+        } finally {
+          window.close(); // ✅ Always close the popup
+        }
+      })();
     </script>
   `;
 
   res.send(script);
 };
+
 
 
 
