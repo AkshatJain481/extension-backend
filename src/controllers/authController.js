@@ -40,33 +40,44 @@ const login = (req, res) => {
   res.redirect(instagramAuthUrl);
 };
 
-const redirectInstagram = async (req, res) => {
+router.get("/redirectinstagram", async (req, res) => {
   const { code } = req.query;
 
   if (!code) {
     return res.status(400).json({ error: "Authorization code is missing." });
   }
 
-  const extensionId = "bdapmfkonpgamlakoplnbllgdaboopgi"; // Your extension ID
+  try {
+    // Exchange the code for an access token
+    const tokenResponse = await axios.post(
+      "https://api.instagram.com/oauth/access_token",
+      {
+        client_id: process.env.CLIENT_ID,
+        client_secret: process.env.CLIENT_SECRET,
+        grant_type: "authorization_code",
+        redirect_uri: process.env.redirectURI,
+        code: code,
+      }
+    );
 
-  const script = `
-    <script>
-      (async function() {
-        try {
-          console.log("Sending code to extension...");
-          const response = await chrome.runtime.sendMessage("${extensionId}", { code: "${code}" });
-          console.log("Response from extension:", response);
-        } catch (error) {
-          console.error("Error sending message:", error);
-        } finally {
-          window.close(); // ✅ Always close the popup
-        }
-      })();
-    </script>
-  `;
+    const accessToken = tokenResponse.data.access_token;
 
-  res.send(script);
-};
+    // Send the access token back to the extension via postMessage
+    const script = `
+      <script>
+        (function() {
+          window.opener.postMessage({ accessToken: "${accessToken}" }, "*");
+          window.close();
+        })();
+      </script>
+    `;
+
+    res.send(script);
+  } catch (error) {
+    console.error("Error exchanging code for access token:", error);
+    res.status(500).send("Error during authentication");
+  }
+});
 
 
 
